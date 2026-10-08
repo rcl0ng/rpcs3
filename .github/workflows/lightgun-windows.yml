@@ -6,6 +6,9 @@ defaults:
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - lichtknarre-fake-move-yfix
 
 env:
   BUILD_REPOSITORY_NAME: ${{ github.repository }}
