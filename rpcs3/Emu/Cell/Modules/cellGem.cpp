@@ -2018,6 +2018,7 @@ static inline void ds3_get_stick_values(u32 gem_num, const std::shared_ptr<Pad>&
 {
 	x_pos = 0.0f;
 	y_pos = 0.0f;
+	static std::array<u16, CELL_GEM_MAX_NUM> seen_y_buckets{};
 
 	const auto& cfg = ::at32(g_cfg_gem_fake.players, gem_num);
 	cfg->handle_input(pad, true, [&](const auto& value, bool& /*abort*/)
@@ -2028,7 +2029,23 @@ static inline void ds3_get_stick_values(u32 gem_num, const std::shared_ptr<Pad>&
 		switch (value.btn)
 		{
 		case gem_btn::x_axis: x_pos = value.value / 255.0f; break;
-		case gem_btn::y_axis: y_pos = value.value / 255.0f; break;
+		case gem_btn::y_axis:
+		{
+			// Lichtknarre/vJoy arrives as an inverted half-range Y axis.
+			constexpr f32 lichtknarre_y_min = 128.0f;
+			constexpr f32 lichtknarre_y_range = 255.0f - lichtknarre_y_min;
+			y_pos = std::clamp((255.0f - value.value) / lichtknarre_y_range, 0.0f, 1.0f);
+
+			// Log each observed 16-value bucket once per Move controller.
+			const u16 bucket = std::min<u16>(value.value / 16, 15);
+			const u16 bucket_mask = static_cast<u16>(1u << bucket);
+			if (!(seen_y_buckets[gem_num] & bucket_mask))
+			{
+				seen_y_buckets[gem_num] |= bucket_mask;
+				cellGem.notice("Lichtknarre diagnostic: Move %u raw Y=%u, corrected Y=%f", gem_num + 1, value.value, y_pos);
+			}
+			break;
+		}
 		default: break;
 		}
 	});
